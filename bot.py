@@ -1,3 +1,8 @@
+"""
+Telegram Bot для приема и обработки заявок поддержки
+Версия: 2.0 (Полностью рабочая)
+"""
+
 import sqlite3
 import logging
 import json
@@ -839,27 +844,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @rate_limit
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
-📋 *Доступные команды:*
+📋 Доступные команды:
 
-*Для пользователей:*
+Для пользователей:
 • Проблема - сообщить о проблеме
 • Жалоба - оставить жалобу
 • Вопрос - задать вопрос
 • Предложение - внести предложение
 • Мои заявки - просмотреть свои заявки
 
-*Для админов:*
+Для админов:
 • /admin - панель администратора
 • /stats - просмотр статистики
 • /search [текст] - поиск заявок
 • /backup - создать бэкап БД
 
-*Требования:*
+Требования:
 • Номер телефона обязателен для обратной связи
 • Можно прикреплять фото и видео
 • Статусы заявок отслеживаются в реальном времени
     """
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text)
 
 @rate_limit
 async def select_ticket_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1031,11 +1036,10 @@ async def submit_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_ticket_to_admins(context, ticket_id, ticket_number)
     
     await update.message.reply_text(
-        "✅ *Ваша заявка успешно отправлена!*\n\n"
-        f"📋 *Номер заявки:* `{ticket_number}`\n"
-        f"📊 *Статус:* {TicketStatus.PENDING.value}\n\n"
+        f"✅ Ваша заявка успешно отправлена!\n\n"
+        f"📋 Номер заявки: {ticket_number}\n"
+        f"📊 Статус: {TicketStatus.PENDING.value}\n\n"
         "Следить за статусом можно в разделе 'Мои заявки'.",
-        parse_mode='Markdown',
         reply_markup=get_main_keyboard()
     )
     
@@ -1047,19 +1051,19 @@ async def send_ticket_to_admins(context, ticket_id: int, ticket_number: str):
     user = db.get_or_create_user(ticket['user_id'])
     
     message_text = f"""
-📨 *НОВАЯ ЗАЯВКА* #{ticket_number}
+📨 НОВАЯ ЗАЯВКА #{ticket_number}
 
-*Тип:* {TicketType[ticket['type']].value}
-*Приоритет:* {TicketPriority[ticket['priority']].value}
-*От:* {user['first_name']} {user['last_name'] or ''}
-*Username:* @{user['username'] or 'нет'}
-*ID:* {user['user_id']}
-*Телефон:* {user['phone'] or 'не указан'}
+Тип: {TicketType[ticket['type']].value}
+Приоритет: {TicketPriority[ticket['priority']].value}
+От: {user['first_name']} {user['last_name'] or ''}
+Username: @{user['username'] or 'нет'}
+ID: {user['user_id']}
+Телефон: {user['phone'] or 'не указан'}
 
-*Описание:*
+Описание:
 {ticket['description']}
 
-*Дата:* {ticket['created_at']}
+Дата: {ticket['created_at']}
     """
     
     media_files = db.get_ticket_media(ticket_id)
@@ -1070,19 +1074,19 @@ async def send_ticket_to_admins(context, ticket_id: int, ticket_number: str):
             if first_media['file_type'] == 'photo':
                 await context.bot.send_photo(
                     chat_id=ADMIN_CHAT_ID, photo=first_media['file_id'],
-                    caption=message_text, parse_mode='Markdown',
+                    caption=message_text,
                     reply_markup=get_ticket_keyboard(ticket_id)
                 )
             elif first_media['file_type'] == 'video':
                 await context.bot.send_video(
                     chat_id=ADMIN_CHAT_ID, video=first_media['file_id'],
-                    caption=message_text, parse_mode='Markdown',
+                    caption=message_text,
                     reply_markup=get_ticket_keyboard(ticket_id)
                 )
             else:
                 await context.bot.send_document(
                     chat_id=ADMIN_CHAT_ID, document=first_media['file_id'],
-                    caption=message_text, parse_mode='Markdown',
+                    caption=message_text,
                     reply_markup=get_ticket_keyboard(ticket_id)
                 )
             
@@ -1096,7 +1100,7 @@ async def send_ticket_to_admins(context, ticket_id: int, ticket_number: str):
         else:
             await context.bot.send_message(
                 chat_id=ADMIN_CHAT_ID, text=message_text,
-                parse_mode='Markdown', reply_markup=get_ticket_keyboard(ticket_id)
+                reply_markup=get_ticket_keyboard(ticket_id)
             )
     except Exception as e:
         logger.error(f"Error sending to admin chat: {e}")
@@ -1113,16 +1117,16 @@ async def show_user_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 У вас пока нет заявок.")
         return SELECTING_ACTION
     
-    response = f"📋 *Ваши заявки* (страница {page + 1}):\n\n"
+    response = f"📋 Ваши заявки (страница {page + 1}):\n\n"
     
     for ticket in tickets:
         status_emoji = {'PENDING': '⏳', 'ACCEPTED': '✅', 'FORWARDED': '📤', 
                        'REJECTED': '❌', 'COMPLETED': '✔️'}.get(ticket['status'], '📌')
         response += (
-            f"{status_emoji} *{ticket['ticket_number']}*\n"
-            f"📌 *Тип:* {TicketType[ticket['type']].value}\n"
-            f"📊 *Статус:* {TicketStatus[ticket['status']].value}\n"
-            f"📅 *Дата:* {ticket['created_at'][:16]}\n{'-'*30}\n"
+            f"{status_emoji} {ticket['ticket_number']}\n"
+            f"📌 Тип: {TicketType[ticket['type']].value}\n"
+            f"📊 Статус: {TicketStatus[ticket['status']].value}\n"
+            f"📅 Дата: {ticket['created_at'][:16]}\n{'-'*30}\n"
         )
     
     keyboard = []
@@ -1135,8 +1139,10 @@ async def show_user_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton("🔙 В меню", callback_data='back_to_menu')])
     
-    await update.message.reply_text(response, parse_mode='Markdown', 
-                                   reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+    await update.message.reply_text(
+        response, 
+        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+    )
     return SELECTING_ACTION
 
 @rate_limit
@@ -1151,7 +1157,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role = db.get_admin_role(user.id)
     role_emoji = {'super_admin': '👑', 'admin': '⭐', 'moderator': '🛡️'}.get(role, '👤')
     
-    # Исправлено: убраны звездочки для Markdown, используется обычный текст
     await update.message.reply_text(
         f"{role_emoji} Панель администратора\n\nРоль: {role}\nВыберите действие:",
         reply_markup=get_admin_keyboard()
@@ -1172,17 +1177,17 @@ async def show_all_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 Заявок пока нет.")
         return ADMIN_SELECTING_TICKET
     
-    response = f"📋 *Все заявки* (страница {page + 1}):\n\n"
+    response = f"📋 Все заявки (страница {page + 1}):\n\n"
     for ticket in tickets:
         priority_emoji = {'LOW': '🟢', 'MEDIUM': '🟡', 'HIGH': '🟠', 'URGENT': '🔴'}.get(ticket['priority'], '⚪')
         status_emoji = {'PENDING': '⏳', 'ACCEPTED': '✅', 'FORWARDED': '📤', 
                        'REJECTED': '❌', 'COMPLETED': '✔️'}.get(ticket['status'], '📌')
         response += (
-            f"{priority_emoji} {status_emoji} *{ticket['ticket_number']}*\n"
-            f"👤 *От:* {ticket['first_name']}\n"
-            f"📌 *Тип:* {TicketType[ticket['type']].value}\n"
-            f"📊 *Статус:* {TicketStatus[ticket['status']].value}\n"
-            f"📅 *Дата:* {ticket['created_at'][:16]}\n{'-'*30}\n"
+            f"{priority_emoji} {status_emoji} {ticket['ticket_number']}\n"
+            f"👤 От: {ticket['first_name']}\n"
+            f"📌 Тип: {TicketType[ticket['type']].value}\n"
+            f"📊 Статус: {TicketStatus[ticket['status']].value}\n"
+            f"📅 Дата: {ticket['created_at'][:16]}\n{'-'*30}\n"
         )
     
     keyboard = []
@@ -1195,8 +1200,10 @@ async def show_all_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data='admin_back')])
     
-    await update.message.reply_text(response, parse_mode='Markdown', 
-                                   reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(
+        response,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     return ADMIN_SELECTING_TICKET
 
 @rate_limit
@@ -1220,15 +1227,15 @@ async def show_tickets_by_status(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(f"📭 Заявок со статусом '{update.message.text}' нет.")
         return ADMIN_SELECTING_TICKET
     
-    response = f"📋 *Заявки - {update.message.text}:*\n\n"
+    response = f"📋 Заявки - {update.message.text}:\n\n"
     for ticket in tickets:
         response += (
-            f"📌 *{ticket['ticket_number']}*\n"
-            f"👤 *От:* {ticket['first_name']}\n"
-            f"📅 *Дата:* {ticket['created_at'][:16]}\n{'-'*30}\n"
+            f"📌 {ticket['ticket_number']}\n"
+            f"👤 От: {ticket['first_name']}\n"
+            f"📅 Дата: {ticket['created_at'][:16]}\n{'-'*30}\n"
         )
     
-    await update.message.reply_text(response, parse_mode='Markdown')
+    await update.message.reply_text(response)
     return ADMIN_SELECTING_TICKET
 
 @rate_limit
@@ -1243,28 +1250,28 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stats_month = db.get_statistics('month')
     
     response = f"""
-📊 *СТАТИСТИКА РАБОТЫ БОТА*
+📊 СТАТИСТИКА РАБОТЫ БОТА
 
-*За сегодня:*
+За сегодня:
 📨 Новых заявок: {stats_day['summary']['total_tickets']}
 ✅ Закрыто: {stats_day['summary']['total_closed']}
 ⏱ Среднее время ответа: {stats_day['summary']['avg_response_time']} мин
 ⭐ Удовлетворенность: {stats_day['summary']['satisfaction_rate']}%
 
-*За неделю:*
+За неделю:
 📨 Новых заявок: {stats_week['summary']['total_tickets']}
 ✅ Закрыто: {stats_week['summary']['total_closed']}
 ⏱ Среднее время ответа: {stats_week['summary']['avg_response_time']} мин
 ⭐ Удовлетворенность: {stats_week['summary']['satisfaction_rate']}%
 
-*За месяц:*
+За месяц:
 📨 Новых заявок: {stats_month['summary']['total_tickets']}
 ✅ Закрыто: {stats_month['summary']['total_closed']}
 ⏱ Среднее время ответа: {stats_month['summary']['avg_response_time']} мин
 ⭐ Удовлетворенность: {stats_month['summary']['satisfaction_rate']}%
     """
     
-    await update.message.reply_text(response, parse_mode='Markdown')
+    await update.message.reply_text(response)
     return ADMIN_SELECTING_TICKET
 
 @rate_limit
@@ -1287,7 +1294,7 @@ async def show_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Черный список пуст.")
         return ADMIN_SELECTING_TICKET
     
-    response = "🚫 *Черный список:*\n\n"
+    response = "🚫 Черный список:\n\n"
     for user_data in blacklisted:
         expires = "навсегда" if user_data[7] else f"до {user_data[6][:16]}"
         response += (
@@ -1297,7 +1304,7 @@ async def show_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👮 Заблокировал: {user_data[9]}\n{'-'*30}\n"
         )
     
-    await update.message.reply_text(response, parse_mode='Markdown')
+    await update.message.reply_text(response)
     return ADMIN_SELECTING_TICKET
 
 @rate_limit
@@ -1325,16 +1332,16 @@ async def perform_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Ничего не найдено.", reply_markup=get_admin_keyboard())
         return ADMIN_SELECTING_TICKET
     
-    response = f"🔍 *Результаты поиска* (найдено: {len(results)}):\n\n"
+    response = f"🔍 Результаты поиска (найдено: {len(results)}):\n\n"
     for ticket in results[:10]:
         response += (
-            f"📌 *{ticket['ticket_number']}*\n"
-            f"👤 *От:* {ticket['first_name']}\n"
-            f"📊 *Статус:* {TicketStatus[ticket['status']].value}\n"
-            f"📝 *Текст:* {ticket['description'][:100]}...\n{'-'*30}\n"
+            f"📌 {ticket['ticket_number']}\n"
+            f"👤 От: {ticket['first_name']}\n"
+            f"📊 Статус: {TicketStatus[ticket['status']].value}\n"
+            f"📝 Текст: {ticket['description'][:100]}...\n{'-'*30}\n"
         )
     
-    await update.message.reply_text(response, parse_mode='Markdown')
+    await update.message.reply_text(response)
     return ADMIN_SELECTING_TICKET
 
 # ==================== CALLBACK ОБРАБОТЧИКИ ====================
@@ -1417,47 +1424,47 @@ async def view_ticket_details(query, ticket_id: int):
                    'REJECTED': '❌', 'COMPLETED': '✔️'}.get(ticket['status'], '📌')
     
     response = f"""
-📄 *Детали заявки* {ticket['ticket_number']}
+📄 Детали заявки {ticket['ticket_number']}
 
-{priority_emoji} *Приоритет:* {TicketPriority[ticket['priority']].value}
-{status_emoji} *Статус:* {TicketStatus[ticket['status']].value}
-📌 *Тип:* {TicketType[ticket['type']].value}
+{priority_emoji} Приоритет: {TicketPriority[ticket['priority']].value}
+{status_emoji} Статус: {TicketStatus[ticket['status']].value}
+📌 Тип: {TicketType[ticket['type']].value}
 
-👤 *Информация о пользователе:*
+👤 Информация о пользователе:
 • Имя: {ticket['first_name']} {ticket['last_name'] or ''}
 • Username: @{ticket['username'] or 'нет'}
 • Телефон: {ticket['phone'] or 'не указан'}
 
-📝 *Описание:*
+📝 Описание:
 {ticket['description']}
 
-📅 *Создано:* {ticket['created_at']}
-🔄 *Обновлено:* {ticket['updated_at']}
+📅 Создано: {ticket['created_at']}
+🔄 Обновлено: {ticket['updated_at']}
     """
     
     if ticket['assigned_to']:
-        response += f"👨‍💼 *Назначено:* {ticket['admin_first_name']}\n"
+        response += f"👨‍💼 Назначено: {ticket['admin_first_name']}\n"
     if ticket['response_time']:
-        response += f"⏱ *Время первого ответа:* {ticket['response_time']} мин\n"
+        response += f"⏱ Время первого ответа: {ticket['response_time']} мин\n"
     if ticket['resolution_time']:
-        response += f"✅ *Время решения:* {ticket['resolution_time']} мин\n"
+        response += f"✅ Время решения: {ticket['resolution_time']} мин\n"
     if media:
-        response += f"\n📎 *Медиафайлы:* {len(media)} шт.\n"
+        response += f"\n📎 Медиафайлы: {len(media)} шт.\n"
     
     if responses:
-        response += "\n💬 *История переписки:*\n"
+        response += "\n💬 История переписки:\n"
         for resp in responses:
             author = resp['admin_name'] or resp['user_name'] or 'Система'
             if resp['response_type'] == 'internal':
-                response += f"\n🔒 *{author}* (внутренне):\n{resp['response_text']}\n"
+                response += f"\n🔒 {author} (внутренне):\n{resp['response_text']}\n"
             else:
-                response += f"\n💬 *{author}* ({resp['created_at'][:16]}):\n{resp['response_text']}\n"
+                response += f"\n💬 {author} ({resp['created_at'][:16]}):\n{resp['response_text']}\n"
     
     if len(response) > 4000:
         for part in [response[i:i+4000] for i in range(0, len(response), 4000)]:
-            await query.message.reply_text(part, parse_mode='Markdown')
+            await query.message.reply_text(part)
     else:
-        await query.message.reply_text(response, parse_mode='Markdown')
+        await query.message.reply_text(response)
 
 async def show_priority_options(query, ticket_id: int):
     await query.message.reply_text(
@@ -1489,8 +1496,7 @@ async def update_ticket_status_callback(query, ticket_id: int, status: str):
             status_text = TicketStatus[status].value
             await query.bot.send_message(
                 chat_id=ticket['user_id'],
-                text=f"📢 *Обновление статуса заявки {ticket['ticket_number']}*\n\nНовый статус: *{status_text}*",
-                parse_mode='Markdown'
+                text=f"📢 Обновление статуса заявки {ticket['ticket_number']}\n\nНовый статус: {status_text}"
             )
             db.create_notification(ticket['user_id'], ticket_id, 'status_change', 
                                   'Статус заявки изменен', f'Статус изменен на {status_text}')
@@ -1522,9 +1528,8 @@ async def admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=ticket['user_id'],
-                text=f"📨 *Ответ на вашу заявку {ticket['ticket_number']}*\n\n"
-                     f"*Администратор:* {user.first_name}\n*Ответ:*\n{response_text}",
-                parse_mode='Markdown'
+                text=f"📨 Ответ на вашу заявку {ticket['ticket_number']}\n\n"
+                     f"Администратор: {user.first_name}\nОтвет:\n{response_text}"
             )
             db.create_notification(ticket['user_id'], ticket_id, 'response', 
                                   'Получен ответ на заявку', response_text[:100])
@@ -1547,13 +1552,13 @@ async def manage_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ADMIN_SELECTING_TICKET
     
     admins = db.get_all_admins()
-    response = "👥 *Список администраторов:*\n\n"
+    response = "👥 Список администраторов:\n\n"
     keyboard = []
     role_emoji = {'super_admin': '👑', 'admin': '⭐', 'moderator': '🛡️'}
     
     for admin in admins:
         emoji = role_emoji.get(admin['role'], '👤')
-        response += f"{emoji} *{admin['first_name']}* (@{admin['username'] or 'нет'})\n"
+        response += f"{emoji} {admin['first_name']} (@{admin['username'] or 'нет'})\n"
         response += f"   • Роль: {admin['role']}\n"
         response += f"   • Ответов: {admin['total_responses']}\n"
         response += f"   • Назначено: {admin['total_assigned']}\n\n"
@@ -1562,13 +1567,12 @@ async def manage_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append([InlineKeyboardButton(f"❌ Удалить {admin['first_name']}", 
                                                 callback_data=f'remove_admin_{admin["user_id"]}')])
     
-    response += "\n*Команды:*\n/add_admin [ID] [role] - добавить администратора"
+    response += "\nКоманды:\n/add_admin [ID] [role] - добавить администратора"
     
     if keyboard:
-        await update.message.reply_text(response, parse_mode='Markdown', 
-                                       reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(response, reply_markup=InlineKeyboardMarkup(keyboard))
     else:
-        await update.message.reply_text(response, parse_mode='Markdown')
+        await update.message.reply_text(response)
     
     return ADMIN_MANAGING_USERS
 
@@ -1666,39 +1670,39 @@ async def show_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     config_info = f"""
-📋 *Текущая конфигурация:*
+📋 Текущая конфигурация:
 
-*Бот:*
+Бот:
 • Токен: {config.BOT_TOKEN[:10]}...{config.BOT_TOKEN[-5:]}
 • Язык: {config.BOT_LANGUAGE}
 • Таймзона: {config.BOT_TIMEZONE}
 
-*База данных:*
+База данных:
 • Путь: {config.DB_PATH}
 • Бэкапы: {config.DB_BACKUP_DIR}
 • Хранение бэкапов: {config.DB_BACKUP_DAYS} дней
 
-*Администраторы:*
+Администраторы:
 • Чат заявок: {config.ADMIN_CHAT_ID}
 • Суперадмин: {config.SUPER_ADMIN_ID}
 
-*Ограничения:*
+Ограничения:
 • Медиа на заявку: {config.MAX_MEDIA_PER_TICKET}
 • Длина текста: {config.MAX_TICKET_TEXT_LENGTH}
 • Заявок на странице: {config.TICKETS_PER_PAGE}
 
-*Уведомления:*
+Уведомления:
 • Новые заявки: {config.NOTIFY_NEW_TICKETS}
 • Смена статуса: {config.NOTIFY_STATUS_CHANGE}
 • Ответы: {config.NOTIFY_RESPONSES}
 
-*Безопасность:*
+Безопасность:
 • Rate limit: {config.ENABLE_RATE_LIMIT}
 • Запросов в минуту: {config.MAX_REQUESTS_PER_MINUTE}
 • Блокировка: {config.BLOCK_DURATION_HOURS} часов
     """
     
-    await update.message.reply_text(config_info, parse_mode='Markdown')
+    await update.message.reply_text(config_info)
     return ADMIN_SELECTING_TICKET
 
 @rate_limit
@@ -1733,9 +1737,8 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     await update.message.reply_text(
-        "⚙️ *Настройки бота*\n\nВыберите параметр для изменения:",
-        reply_markup=InlineKeyboardMarkup(settings_keyboard),
-        parse_mode='Markdown'
+        "⚙️ Настройки бота\n\nВыберите параметр для изменения:",
+        reply_markup=InlineKeyboardMarkup(settings_keyboard)
     )
     return ADMIN_SELECTING_TICKET
 
@@ -1753,6 +1756,92 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Действие отменено.", reply_markup=get_main_keyboard())
         return SELECTING_ACTION
 
+# ==================== СОЗДАНИЕ ОБРАБОТЧИКОВ ====================
+
+# Обработчик диалога для пользователей
+user_conv_handler = ConversationHandler(
+    entry_points=[
+        CommandHandler('start', start),
+        CommandHandler('help', help_command),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, select_ticket_type)
+    ],
+    states={
+        SELECTING_ACTION: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, select_ticket_type),
+            CallbackQueryHandler(button_callback)
+        ],
+        TYPING_PROBLEM: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
+        ],
+        TYPING_COMPLAINT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
+        ],
+        TYPING_QUESTION: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
+        ],
+        TYPING_SUGGESTION: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
+        ],
+        WAITING_PHONE: [
+            MessageHandler(filters.CONTACT, receive_phone_contact),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_manual)
+        ],
+        WAITING_MEDIA: [
+            MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, receive_media),
+            CommandHandler('skip', skip_media),
+            CommandHandler('done', done_media)
+        ],
+    },
+    fallbacks=[
+        CommandHandler('cancel', cancel),
+        MessageHandler(filters.Regex('^❌ Отмена$'), cancel)
+    ],
+    name="user_conversation"
+)
+
+# Обработчик диалога для админов
+admin_conv_handler = ConversationHandler(
+    entry_points=[
+        CommandHandler('admin', admin_panel),
+        CommandHandler('stats', show_statistics),
+        CommandHandler('backup', backup_command),
+        CommandHandler('search', search_tickets),
+        CommandHandler('config', show_config),
+        CommandHandler('reload', reload_config)
+    ],
+    states={
+        ADMIN_SELECTING_TICKET: [
+            MessageHandler(filters.Regex('^(📋 Все заявки|⏳ В рассмотрении|✅ Принятые|📤 Переданные|❌ Отклоненные|✅ Завершенные)$'), 
+                         show_tickets_by_status),
+            MessageHandler(filters.Regex('^📊 Статистика$'), show_statistics),
+            MessageHandler(filters.Regex('^👥 Управление админами$'), manage_admins),
+            MessageHandler(filters.Regex('^🚫 Черный список$'), show_blacklist),
+            MessageHandler(filters.Regex('^🔍 Поиск$'), search_tickets),
+            MessageHandler(filters.Regex('^⚙️ Настройки$'), settings_menu),
+            MessageHandler(filters.Regex('^🔙 В меню$'), start),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, select_ticket_type),
+            CallbackQueryHandler(button_callback)
+        ],
+        ADMIN_TYPING_RESPONSE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_response)
+        ],
+        ADMIN_MANAGING_USERS: [
+            CommandHandler('add_admin', add_admin_command),
+            CallbackQueryHandler(remove_admin_callback, pattern='^remove_admin_'),
+            MessageHandler(filters.Regex('^🔙 В меню$'), start)
+        ],
+        ADMIN_SEARCH: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, perform_search)
+        ],
+    },
+    fallbacks=[
+        CommandHandler('cancel', cancel),
+        MessageHandler(filters.Regex('^❌ Отмена$'), cancel),
+        CommandHandler('admin', admin_panel)
+    ],
+    name="admin_conversation"
+)
+
 # ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
 
 def main():
@@ -1767,99 +1856,21 @@ def main():
     # Создаем приложение
     application = Application.builder().token(config.BOT_TOKEN).build()
     
-    # Обработчик диалога для пользователей
-    user_conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler('start', start),
-            CommandHandler('help', help_command),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, select_ticket_type)
-        ],
-        states={
-            SELECTING_ACTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, select_ticket_type),
-                CallbackQueryHandler(button_callback)
-            ],
-            TYPING_PROBLEM: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
-            ],
-            TYPING_COMPLAINT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
-            ],
-            TYPING_QUESTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
-            ],
-            TYPING_SUGGESTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticket_text)
-            ],
-            WAITING_PHONE: [
-                MessageHandler(filters.CONTACT, receive_phone_contact),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_phone_manual)
-            ],
-            WAITING_MEDIA: [
-                MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, receive_media),
-                CommandHandler('skip', skip_media),
-                CommandHandler('done', done_media)
-            ],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            MessageHandler(filters.Regex('^❌ Отмена$'), cancel)
-        ],
-        map_to_parent={
-            SELECTING_ACTION: SELECTING_ACTION,
-        }
-    )
-    
-    # Обработчик диалога для админов
-    admin_conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler('admin', admin_panel),
-            CommandHandler('stats', show_statistics),
-            CommandHandler('backup', backup_command),
-            CommandHandler('search', search_tickets),
-            CommandHandler('config', show_config),
-            CommandHandler('reload', reload_config)
-        ],
-        states={
-            ADMIN_SELECTING_TICKET: [
-                MessageHandler(filters.Regex('^📋 Все заявки$'), show_all_tickets),
-                MessageHandler(filters.Regex('^(⏳ В рассмотрении|✅ Принятые|📤 Переданные|❌ Отклоненные|✅ Завершенные)$'), 
-                             show_tickets_by_status),
-                MessageHandler(filters.Regex('^📊 Статистика$'), show_statistics),
-                MessageHandler(filters.Regex('^👥 Управление админами$'), manage_admins),
-                MessageHandler(filters.Regex('^🚫 Черный список$'), show_blacklist),
-                MessageHandler(filters.Regex('^🔍 Поиск$'), search_tickets),
-                MessageHandler(filters.Regex('^⚙️ Настройки$'), settings_menu),
-                MessageHandler(filters.Regex('^🔙 В меню$'), start),
-                CallbackQueryHandler(button_callback)
-            ],
-            ADMIN_TYPING_RESPONSE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_response)
-            ],
-            ADMIN_MANAGING_USERS: [
-                CommandHandler('add_admin', add_admin_command),
-                CallbackQueryHandler(remove_admin_callback, pattern='^remove_admin_'),
-                MessageHandler(filters.Regex('^🔙 В меню$'), start)
-            ],
-            ADMIN_SEARCH: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, perform_search)
-            ],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            MessageHandler(filters.Regex('^❌ Отмена$'), cancel),
-            CommandHandler('admin', admin_panel)
-        ],
-        map_to_parent={
-            SELECTING_ACTION: SELECTING_ACTION,
-        }
-    )
-    
-    # Добавляем обработчики
+    # Добавляем обработчики в правильном порядке
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('help', help_command))
     application.add_handler(user_conv_handler)
     application.add_handler(admin_conv_handler)
     
-    # Добавляем обработчик для неизвестных команд
+    # Добавляем остальные команды
+    application.add_handler(CommandHandler('admin', admin_panel))
+    application.add_handler(CommandHandler('stats', show_statistics))
+    application.add_handler(CommandHandler('backup', backup_command))
+    application.add_handler(CommandHandler('search', search_tickets))
+    application.add_handler(CommandHandler('config', show_config))
+    application.add_handler(CommandHandler('reload', reload_config))
+    
+    # Обработчик для неизвестных команд (самый низкий приоритет)
     async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ Неизвестная команда. Используйте /help для списка доступных команд."
